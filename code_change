@@ -1,0 +1,759 @@
+Dưới đây là bộ `dependencies` (kèm `plugins` tối thiểu) cho **từng module** theo đúng sơ đồ bạn đã chốt. Mình viết theo **Version Catalog** (`libs.*`) để bạn copy thẳng vào `build.gradle.kts` của từng module.
+
+> Lưu ý: bạn cần khai báo các alias tương ứng trong `libs.versions.toml` (Compose BOM, Hilt, Room, Paging, Work, Retrofit/OkHttp, Coroutines, Lifecycle, v.v.). Nếu alias bạn khác tên, chỉ cần đổi `libs.xxx` cho khớp.
+
+---
+
+## :app
+
+```kotlin
+plugins {
+  id("com.android.application")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+}
+
+dependencies {
+  implementation(project(":core:ui"))
+  implementation(project(":core:navigation"))
+  implementation(project(":core:common"))
+
+  implementation(project(":feature:expense"))
+  implementation(project(":feature:tag"))
+  implementation(project(":feature:subscription"))
+  implementation(project(":feature:settings"))
+
+  // Compose
+  implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.androidx.activity.compose)
+  implementation(libs.androidx.compose.ui)
+  implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.compose.ui.tooling.preview)
+
+  // Navigation + Lifecycle
+  implementation(libs.androidx.navigation.compose)
+  implementation(libs.androidx.lifecycle.runtime.compose)
+
+  // DI
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+
+  // Debug tooling
+  debugImplementation(libs.androidx.compose.ui.tooling)
+
+  // Test (tuỳ chọn)
+  testImplementation(libs.junit)
+  testImplementation(libs.kotlinx.coroutines.test)
+}
+```
+
+---
+
+## :core:common (Result, Dispatcher, utils, coroutine helpers)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+}
+
+dependencies {
+  // Kotlin / Coroutines
+  implementation(libs.kotlinx.coroutines.core)
+  implementation(libs.kotlinx.coroutines.android)
+
+  // (Optional) immutable collections / datetime
+  // implementation(libs.kotlinx.collections.immutable)
+  // implementation(libs.kotlinx.datetime)
+
+  // (Optional) javax.inject annotations if you want interfaces without Hilt in core
+  implementation(libs.javax.inject)
+
+  // Test
+  testImplementation(libs.junit)
+  testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.turbine)
+}
+```
+
+---
+
+## :core:ui (Design System)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+}
+
+dependencies {
+  implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.androidx.compose.ui)
+  implementation(libs.androidx.compose.foundation)
+  implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.compose.ui.tooling.preview)
+  implementation(libs.androidx.compose.material.icons.extended)
+
+  debugImplementation(libs.androidx.compose.ui.tooling)
+
+  // (Optional) fonts
+  // implementation(libs.androidx.compose.ui.text.google.fonts)
+}
+```
+
+---
+
+## :core:navigation (Route/Graph contracts)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+}
+
+dependencies {
+  implementation(libs.androidx.navigation.compose)
+
+  // Nếu bạn muốn để contract thuần Kotlin (không phụ thuộc Compose),
+  // có thể bỏ navigation-compose và chỉ giữ các "route constants"/interfaces trong module này.
+}
+```
+
+---
+
+## :core:database (Room + DAO + Migration)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.devtools.ksp")
+}
+
+dependencies {
+  implementation(project(":core:common"))
+
+  implementation(libs.room.runtime)
+  implementation(libs.room.ktx)
+  ksp(libs.room.compiler)
+
+  // Test (tuỳ chọn)
+  testImplementation(libs.junit)
+  testImplementation(libs.kotlinx.coroutines.test)
+  androidTestImplementation(libs.androidx.test.runner)
+  androidTestImplementation(libs.androidx.test.junit)
+  androidTestImplementation(libs.room.testing)
+}
+```
+
+---
+
+## :core:datastore (settings/subscription prefs)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+}
+
+dependencies {
+  implementation(project(":core:common"))
+  implementation(libs.datastore.preferences)
+
+  // Test
+  testImplementation(libs.junit)
+  testImplementation(libs.kotlinx.coroutines.test)
+}
+```
+
+---
+
+## :core:network (optional: Retrofit/OkHttp + DTO + API)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+dependencies {
+  implementation(project(":core:common"))
+
+  implementation(libs.retrofit.core)
+  implementation(libs.okhttp.core)
+  implementation(libs.okhttp.logging)
+
+  // Converter: chọn 1 trong 2
+  implementation(libs.retrofit.kotlinx.serialization) // nếu dùng kotlinx serialization
+  // implementation(libs.retrofit.moshi)              // nếu dùng Moshi
+
+  implementation(libs.kotlinx.serialization.json)
+
+  // Test (tuỳ chọn)
+  testImplementation(libs.junit)
+  testImplementation(libs.mockk)
+}
+```
+
+---
+
+## :core:testing (optional: test fakes, rules, dispatcher, turbine helpers)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+}
+
+dependencies {
+  api(libs.junit)
+  api(libs.kotlinx.coroutines.test)
+  api(libs.turbine)
+  api(libs.truth)      // hoặc assertj
+  api(libs.mockk)      // hoặc mockito-kotlin
+
+  // (Optional) AndroidX test
+  api(libs.androidx.test.core)
+  api(libs.androidx.test.junit)
+  api(libs.androidx.test.runner)
+}
+```
+
+---
+
+# Feature modules
+
+Tất cả feature modules theo pattern: UI (Compose) + ViewModel (StateFlow) + DI + navigation.
+
+## :feature:expense (CRUD expense + list + paging)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+}
+
+dependencies {
+  implementation(project(":core:ui"))
+  implementation(project(":core:common"))
+  implementation(project(":core:navigation"))
+  implementation(project(":core:database"))
+  implementation(project(":core:datastore"))
+  // implementation(project(":core:network")) // nếu có API
+
+  // Compose
+  implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.androidx.compose.ui)
+  implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.compose.ui.tooling.preview)
+
+  // Lifecycle + Navigation
+  implementation(libs.androidx.lifecycle.runtime.compose)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.navigation.compose)
+
+  // Paging
+  implementation(libs.paging.runtime)
+  implementation(libs.paging.compose)
+
+  // DI
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+  implementation(libs.hilt.nav.compose)
+
+  // Test
+  testImplementation(project(":core:testing"))
+}
+```
+
+---
+
+## :feature:tag (tag management + cross-ref)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+}
+
+dependencies {
+  implementation(project(":core:ui"))
+  implementation(project(":core:common"))
+  implementation(project(":core:navigation"))
+  implementation(project(":core:database"))
+
+  implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.androidx.compose.ui)
+  implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.lifecycle.runtime.compose)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.navigation.compose)
+
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+  implementation(libs.hilt.nav.compose)
+
+  testImplementation(project(":core:testing"))
+}
+```
+
+---
+
+## :feature:subscription (chu kỳ, ngày thanh toán, nhắc nhở)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+}
+
+dependencies {
+  implementation(project(":core:ui"))
+  implementation(project(":core:common"))
+  implementation(project(":core:navigation"))
+  implementation(project(":core:datastore"))
+  implementation(project(":core:database"))
+  // implementation(project(":core:network")) // nếu sync subscription lên server
+
+  implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.androidx.compose.ui)
+  implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.lifecycle.runtime.compose)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.navigation.compose)
+
+  // WorkManager (reminder)
+  implementation(libs.work.runtime)
+
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+  implementation(libs.hilt.nav.compose)
+
+  testImplementation(project(":core:testing"))
+}
+```
+
+---
+
+## :feature:settings (currency, preferences…)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+}
+
+dependencies {
+  implementation(project(":core:ui"))
+  implementation(project(":core:common"))
+  implementation(project(":core:navigation"))
+  implementation(project(":core:datastore"))
+
+  implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.androidx.compose.ui)
+  implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.lifecycle.runtime.compose)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.navigation.compose)
+
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+  implementation(libs.hilt.nav.compose)
+
+  testImplementation(project(":core:testing"))
+}
+```
+
+---
+
+## 2 ghi chú để bạn không bị “lệch” khi ráp dependencies
+
+1. **Hilt + WorkManager**: nếu bạn inject vào `Worker`, bạn sẽ cần thêm integration (tuỳ cách bạn làm), thường là `androidx.hilt:hilt-work` + compiler tương ứng. Nếu bạn chưa inject vào Worker thì chưa cần.
+2. **Database/Network boundaries**: Repository interface nên nằm ở `:core:common` hoặc `feature:*:domain` (tuỳ bạn chọn “domain per feature” hay “shared domain”), còn impl nằm ở `feature:*` hoặc `core` (nếu shared).
+
+Nếu bạn muốn, mình có thể viết luôn một `libs.versions.toml` đầy đủ alias đúng với các `libs.xxx` mình dùng ở trên để bạn copy paste chạy được ngay.
+
+==================================================================
+  ==================================================================
+  ==================================================================
+  ==================================================================
+==================================================================
+==================================================================
+==================================================================
+==================================================================
+==================================================================
+==================================================================
+==================================================================
+
+## 0) Nguyên tắc: module nào cần apply Hilt?
+
+Apply Hilt cho **mọi module có** một trong các thứ sau:
+
+* `@HiltViewModel`, `@AndroidEntryPoint`
+* `@Module` + `@InstallIn(...)`
+* `@HiltWorker` (WorkManager inject)
+
+Với cấu trúc của bạn, thường sẽ apply cho:
+
+* `:app`
+* `:feature:*` (expense/tag/subscription/settings)
+* `:core:database`, `:core:network`, `:core:datastore` (vì chứa `@Module Provide`)
+* `:core:common`, `:core:ui`, `:core:navigation` thường **không cần** (trừ khi bạn để DI module trong đó)
+
+---
+
+## 1) Root Gradle: khai báo plugin Hilt (apply false)
+
+Trong `build.gradle.kts` (root project):
+
+```kotlin
+plugins {
+  id("com.google.dagger.hilt.android") version "<hilt_version>" apply false
+  kotlin("kapt") apply false
+}
+```
+
+Nếu bạn dùng Version Catalog thì tương đương `alias(libs.plugins.hilt) apply false`.
+
+---
+
+## 2) :app — bật Hilt + tạo Application
+
+### 2.1 `:app/build.gradle.kts`
+
+```kotlin
+plugins {
+  id("com.android.application")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+}
+
+dependencies {
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+}
+```
+
+### 2.2 Application
+
+```kotlin
+@HiltAndroidApp
+class ExpenseApp : Application()
+```
+
+Trong `AndroidManifest.xml`:
+
+```xml
+<application
+    android:name=".ExpenseApp"
+    ... >
+</application>
+```
+
+---
+
+## 3) Core modules cung cấp nền tảng (Provide)
+
+Bạn nên đặt các `@Module @InstallIn(SingletonComponent::class)` theo đúng “chủ sở hữu”:
+
+### 3.1 `:core:database` — Room + DAO
+
+**Gradle**
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+  id("com.google.devtools.ksp")
+}
+
+dependencies {
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+
+  implementation(libs.room.runtime)
+  implementation(libs.room.ktx)
+  ksp(libs.room.compiler)
+}
+```
+
+**DI module**
+
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
+
+  @Provides
+  @Singleton
+  fun provideDb(@ApplicationContext context: Context): AppDatabase =
+    Room.databaseBuilder(context, AppDatabase::class.java, "expense.db")
+      .addMigrations(/* MIGRATION_1_2, ... */)
+      .build()
+
+  @Provides
+  fun provideExpenseDao(db: AppDatabase): ExpenseDao = db.expenseDao()
+
+  @Provides
+  fun provideTagDao(db: AppDatabase): TagDao = db.tagDao()
+}
+```
+
+### 3.2 `:core:datastore` — DataStore
+
+**Gradle**
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+}
+
+dependencies {
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+  implementation(libs.datastore.preferences)
+}
+```
+
+**DI module**
+
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+object DataStoreModule {
+
+  @Provides
+  @Singleton
+  fun providePreferencesDataStore(
+    @ApplicationContext context: Context
+  ): DataStore<Preferences> =
+    PreferenceDataStoreFactory.create(
+      produceFile = { context.preferencesDataStoreFile("settings") }
+    )
+}
+```
+
+### 3.3 `:core:network` — Retrofit/OkHttp (nếu có API)
+
+**Gradle**
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+  id("org.jetbrains.kotlin.plugin.serialization") // nếu dùng kotlinx serialization
+}
+
+dependencies {
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+
+  implementation(libs.okhttp.core)
+  implementation(libs.okhttp.logging)
+  implementation(libs.retrofit.core)
+  implementation(libs.kotlinx.serialization.json)
+  implementation(libs.retrofit.kotlinx.serialization)
+}
+```
+
+**DI module**
+
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+
+  @Provides @Singleton
+  fun provideOkHttp(): OkHttpClient =
+    OkHttpClient.Builder()
+      .addInterceptor(HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.BODY
+      })
+      .build()
+
+  @Provides @Singleton
+  fun provideRetrofit(client: OkHttpClient): Retrofit =
+    Retrofit.Builder()
+      .baseUrl("https://example.com/")
+      .client(client)
+      .addConverterFactory(/* your converter */)
+      .build()
+
+  @Provides @Singleton
+  fun provideApi(retrofit: Retrofit): ExpenseApi =
+    retrofit.create(ExpenseApi::class.java)
+}
+```
+
+---
+
+## 4) Feature modules: bind Repository/UseCase + ViewModel
+
+Mỗi feature thường có:
+
+* Interface `Repository` (domain) và `Impl` (data)
+* `@Binds` module để gắn interface -> impl
+* `@HiltViewModel` cho VM
+
+### 4.1 `:feature:expense/build.gradle.kts` (tương tự các feature khác)
+
+```kotlin
+plugins {
+  id("com.android.library")
+  id("org.jetbrains.kotlin.android")
+  id("com.google.dagger.hilt.android")
+  kotlin("kapt")
+}
+
+dependencies {
+  implementation(project(":core:database"))
+  implementation(project(":core:common"))
+  implementation(project(":core:ui"))
+
+  implementation(libs.hilt.android)
+  kapt(libs.hilt.compiler)
+  implementation(libs.hilt.nav.compose)
+}
+```
+
+### 4.2 Bind repository trong feature
+
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class ExpenseBindings {
+
+  @Binds
+  @Singleton
+  abstract fun bindExpenseRepository(
+    impl: ExpenseRepositoryImpl
+  ): ExpenseRepository
+}
+```
+
+Repository impl có thể inject DAO:
+
+```kotlin
+class ExpenseRepositoryImpl @Inject constructor(
+  private val expenseDao: ExpenseDao
+) : ExpenseRepository { ... }
+```
+
+### 4.3 ViewModel
+
+```kotlin
+@HiltViewModel
+class ExpenseViewModel @Inject constructor(
+  private val repo: ExpenseRepository,
+  savedStateHandle: SavedStateHandle
+) : ViewModel() { ... }
+```
+
+### 4.4 Compose screen lấy VM
+
+```kotlin
+@Composable
+fun ExpenseListRoute(
+  vm: ExpenseViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+) {
+  val state by vm.state.collectAsStateWithLifecycle()
+  ExpenseListScreen(state = state, onAction = vm::onAction)
+}
+```
+
+---
+
+## 5) Navigation Compose: không cần @AndroidEntryPoint cho Composable
+
+* Với Compose, bạn thường **không cần** `@AndroidEntryPoint` trên `Activity` nếu bạn đã có `@HiltAndroidApp`? Thực tế: `MainActivity` nên đặt `@AndroidEntryPoint` để Hilt đảm bảo injection cho Android component (và an toàn khi về sau bạn inject gì đó vào Activity).
+
+```kotlin
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() { ... }
+```
+
+Trong NavGraph của feature, cứ gọi `hiltViewModel()` là đủ.
+
+---
+
+## 6) WorkManager + Hilt (cho nhắc nhở thanh toán)
+
+Nếu bạn muốn **inject vào Worker**, cần thêm Hilt Work integration.
+
+### 6.1 Dependencies bổ sung
+
+* Thêm `androidx.hilt:hilt-work`
+* Thêm compiler `androidx.hilt:hilt-compiler` (khác với `com.google.dagger:hilt-compiler`)
+
+Ví dụ đặt vào `:feature:subscription` hoặc `:app` (nơi chứa Worker):
+
+```kotlin
+dependencies {
+  implementation(libs.androidx.hilt.work)
+  kapt(libs.androidx.hilt.compiler)
+
+  implementation(libs.work.runtime)
+}
+```
+
+### 6.2 Worker
+
+```kotlin
+@HiltWorker
+class PaymentReminderWorker @AssistedInject constructor(
+  @Assisted appContext: Context,
+  @Assisted params: WorkerParameters,
+  private val repo: SubscriptionRepository
+) : CoroutineWorker(appContext, params) {
+
+  override suspend fun doWork(): Result {
+    // gửi notification, check kỳ thanh toán...
+    return Result.success()
+  }
+}
+```
+
+### 6.3 Application cấu hình WorkerFactory
+
+```kotlin
+@HiltAndroidApp
+class ExpenseApp : Application(), Configuration.Provider {
+
+  @Inject lateinit var workerFactory: HiltWorkerFactory
+
+  override val workManagerConfiguration: Configuration
+    get() = Configuration.Builder()
+      .setWorkerFactory(workerFactory)
+      .build()
+}
+```
+
+---
+
+## 7) Quy tắc scope nhanh (để không inject sai vòng đời)
+
+* `@Singleton`: Database, Dao, Retrofit/OkHttp, Repository (nếu stateless)
+* `@ViewModelScoped`: usecase/logic chỉ dùng trong VM (tuỳ bạn)
+* `@ActivityRetainedScoped`: thứ cần sống qua rotate nhưng không global
+
+---
+
+============
