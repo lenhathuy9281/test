@@ -1,0 +1,452 @@
+Dưới đây là skeleton tối thiểu nhưng “đúng bài” để bạn **chạy được app Compose + Navigation + Hilt + Room (Flow)** theo hướng **offline-first**, đồng thời phù hợp với **AGP 9 built-in Kotlin** (khác khá nhiều so với các template cũ). AGP 9 có Kotlin tích hợp sẵn và hướng dẫn migrate chính thức khuyến nghị bỏ `kotlin-android` plugin. ([Android Developers][1])
+
+---
+
+## 0) Chốt stack/versions (để khỏi vỡ build)
+
+* **AGP**: 9.0.0 ([Android Developers][2])
+* **Kotlin (built-in)**: 2.2.10 ([Android Developers][2])
+* **Room**: 2.8.4 ([Android Developers][3])
+* **Navigation Compose**: 2.9.7 ([Android Developers][3])
+* **Hilt (Dagger)**: 2.59.1 ([Android Developers][4])
+* **AndroidX Hilt**: 1.3.0 (dùng cho `hilt-navigation-compose`) ([Android Developers][3])
+* **Compose Compiler Gradle plugin**: bắt buộc khi Kotlin ≥ 2.0 ([Android Developers][5])
+* **Compose BOM**: 2026.01.01 ([mvnrepository.com][6])
+* **KSP**: dùng bản **khớp Kotlin 2.2.10**, ví dụ `2.2.10-2.0.2` ([mvnrepository.com][7])
+* `compileSdk/targetSdk`: API 36 (Android 16) ([Android Developers][8])
+
+---
+
+## 1) Cấu trúc module tối thiểu (đủ cho Hilt + Nav + Room)
+
+Tạm thời giữ 3 module để build nhanh, sau đó mở rộng dần theo Phase:
+
+* `:app` (UI + Navigation + Hilt wiring)
+* `:core:database` (Room entities/dao/db)
+* `:core:data` (Repository – offline-first: DB là source of truth)
+
+### `settings.gradle.kts`
+
+```kotlin
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "SpendWise"
+
+include(":app")
+include(":core:database")
+include(":core:data")
+```
+
+---
+
+## 2) Version Catalog (khuyên dùng để dễ quản)
+
+### `gradle/libs.versions.toml`
+
+```toml
+[versions]
+agp = "9.0.0"
+kotlin = "2.2.10"
+
+compose-bom = "2026.01.01" # :contentReference[oaicite:11]{index=11}
+navigation = "2.9.7"       # :contentReference[oaicite:12]{index=12}
+room = "2.8.4"             # :contentReference[oaicite:13]{index=13}
+
+hilt = "2.59.1"            # :contentReference[oaicite:14]{index=14}
+androidx-hilt = "1.3.0"    # :contentReference[oaicite:15]{index=15}
+
+activity = "1.12.3"        # :contentReference[oaicite:16]{index=16}
+
+ksp = "2.2.10-2.0.2"       # khớp Kotlin 2.2.10 :contentReference[oaicite:17]{index=17}
+
+[libraries]
+# Compose
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
+
+# Navigation
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }
+
+# Room
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
+# Hilt
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
+androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidx-hilt" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+
+# Compose compiler plugin (bắt buộc khi Kotlin >= 2.0) :contentReference[oaicite:18]{index=18}
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+
+# Hilt Gradle plugin
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+
+# Với AGP built-in Kotlin, kapt thường dùng qua legacy-kapt :contentReference[oaicite:19]{index=19}
+legacy-kapt = { id = "com.android.legacy-kapt", version.ref = "agp" }
+
+# KSP cho Room
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+```
+
+---
+
+## 3) Root Gradle
+
+### `build.gradle.kts` (root)
+
+```kotlin
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+
+    alias(libs.plugins.kotlin.compose) apply false
+
+    alias(libs.plugins.hilt) apply false
+    alias(libs.plugins.legacy.kapt) apply false
+
+    alias(libs.plugins.ksp) apply false
+}
+```
+
+---
+
+## 4) Module `:app` — Hilt + Navigation + Compose
+
+### `app/build.gradle.kts`
+
+```kotlin
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.legacy.kapt)
+}
+
+android {
+    namespace = "com.example.spendwise"
+    compileSdk = 36 // :contentReference[oaicite:20]{index=20}
+
+    defaultConfig {
+        applicationId = "com.example.spendwise"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = "0.1.0"
+    }
+
+    buildFeatures {
+        compose = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
+    implementation(libs.androidx.activity.compose)
+
+    implementation(libs.androidx.navigation.compose)
+
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
+
+    implementation(project(":core:database"))
+    implementation(project(":core:data"))
+}
+```
+
+### `app/src/main/AndroidManifest.xml`
+
+```xml
+<application
+    android:name=".SpendWiseApp"
+    ... />
+```
+
+### `SpendWiseApp.kt`
+
+```kotlin
+package com.example.spendwise
+
+import android.app.Application
+import dagger.hilt.android.HiltAndroidApp
+
+@HiltAndroidApp
+class SpendWiseApp : Application()
+```
+
+### `MainActivity.kt`
+
+```kotlin
+package com.example.spendwise
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import dagger.hilt.android.AndroidEntryPoint
+
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent { SpendWiseRoot() }
+    }
+}
+```
+
+### Navigation “đơn giản nhất có thể”: 1 `NavHost`, 2 màn
+
+```kotlin
+package com.example.spendwise
+
+import androidx.compose.runtime.Composable
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+
+private object Routes {
+    const val Expenses = "expenses"
+    const val Subscriptions = "subscriptions"
+}
+
+@Composable
+fun SpendWiseRoot() {
+    val navController = rememberNavController()
+
+    NavHost(
+        navController = navController,
+        startDestination = Routes.Expenses
+    ) {
+        composable(Routes.Expenses) { ExpensesScreen() }
+        composable(Routes.Subscriptions) { SubscriptionsScreen() }
+    }
+}
+
+@Composable fun ExpensesScreen() { /* TODO */ }
+@Composable fun SubscriptionsScreen() { /* TODO */ }
+```
+
+---
+
+## 5) Module `:core:database` — Room + Flow
+
+### `core/database/build.gradle.kts`
+
+```kotlin
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
+}
+
+android {
+    namespace = "com.example.core.database"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 26
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+}
+```
+
+### Entities (skeleton, sẽ thay bằng schema BCNF “chốt” của bạn)
+
+```kotlin
+package com.example.core.database.entity
+
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+@Entity(
+    tableName = "tags",
+    indices = [Index(value = ["name"], unique = true)]
+)
+data class TagEntity(
+    @PrimaryKey(autoGenerate = true) val tagId: Long = 0,
+    val name: String
+)
+
+@Entity(tableName = "expenses")
+data class ExpenseEntity(
+    @PrimaryKey(autoGenerate = true) val expenseId: Long = 0,
+    val amount: Long,
+    val occurredAtEpochMs: Long,
+    val note: String?
+)
+
+/**
+ * CrossRef: KHÔNG cần id riêng -> PK (expenseId, tagId)
+ */
+@Entity(
+    tableName = "expense_tag",
+    primaryKeys = ["expenseId", "tagId"]
+)
+data class ExpenseTagCrossRef(
+    val expenseId: Long,
+    val tagId: Long
+)
+```
+
+### DAO (Flow realtime)
+
+```kotlin
+package com.example.core.database.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.example.core.database.entity.ExpenseEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface ExpenseDao {
+
+    @Query("SELECT * FROM expenses ORDER BY occurredAtEpochMs DESC")
+    fun observeAll(): Flow<List<ExpenseEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(expense: ExpenseEntity): Long
+
+    @Query("DELETE FROM expenses WHERE expenseId = :id")
+    suspend fun deleteById(id: Long)
+}
+```
+
+### Database
+
+```kotlin
+package com.example.core.database
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import com.example.core.database.dao.ExpenseDao
+import com.example.core.database.entity.ExpenseEntity
+import com.example.core.database.entity.ExpenseTagCrossRef
+import com.example.core.database.entity.TagEntity
+
+@Database(
+    entities = [ExpenseEntity::class, TagEntity::class, ExpenseTagCrossRef::class],
+    version = 1,
+    exportSchema = true
+)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun expenseDao(): ExpenseDao
+}
+```
+
+---
+
+## 6) Hilt module cấp DB (đặt ở `:app` để core:database khỏi phụ thuộc Hilt)
+
+### `DatabaseModule.kt` (trong `:app`)
+
+```kotlin
+package com.example.spendwise.di
+
+import android.content.Context
+import androidx.room.Room
+import com.example.core.database.AppDatabase
+import com.example.core.database.dao.ExpenseDao
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
+
+    @Provides @Singleton
+    fun provideDb(@ApplicationContext context: Context): AppDatabase =
+        Room.databaseBuilder(context, AppDatabase::class.java, "spendwise.db")
+            // TODO: addMigrations(...) ở Phase 4
+            .build()
+
+    @Provides
+    fun provideExpenseDao(db: AppDatabase): ExpenseDao = db.expenseDao()
+}
+```
+
+---
+
+## 7) Trả lời đúng câu bạn hỏi trước: `expenseId` lấy từ đâu?
+
+Trong skeleton này mình chọn **`@PrimaryKey(autoGenerate = true)`**, nên:
+
+* Khi bạn `insert(expense)` thì **Room trả về `Long` id**:
+
+  ```kotlin
+  val newId: Long = expenseDao.insert(ExpenseEntity(amount=..., occurredAtEpochMs=...))
+  ```
+* `expenseId` **không phải tự nghĩ ra**, cũng không phải từ UI. Nó là **rowId do SQLite/Room cấp** sau khi insert.
+
+Nếu bạn muốn offline-first + sau này sync nhiều thiết bị, một lựa chọn khác là dùng **UUID** (tự generate) làm PK. Nhưng với bài toán local trước, `Long autoGenerate` là đơn giản và ổn định.
+
+---
+
+## Bước tiếp theo (đúng theo “phase skeleton”)
+
+Nếu bạn ok với phần setup này, bước kế tiếp mình sẽ làm ngay:
+
+1. Chốt lại **schema BCNF + unique constraints/FK actions** (đúng với những gì bạn đã yêu cầu trước đó) và cập nhật Room entities theo schema đó.
+2. Dựng `Repository` (offline-first) trong `:core:data` + `UseCase` trong `:core:domain`.
+3. Tạo `feature:expenses` (CRUD + UI state Loading/Error/Empty) chạy end-to-end bằng Flow.
+
+Bạn chỉ cần trả lời: tiếp theo ta chốt **schema BCNF phiên bản cuối** cho các bảng nào (Expense/Tag/ExpenseTag/Subscription/…)? Nếu đã chốt rồi trong các tin trước, bạn dán lại schema “final” là mình cập nhật Room code ngay.
+
+[1]: https://developer.android.com/build/migrate-to-built-in-kotlin "Migrate to built-in Kotlin  |  Android Studio  |  Android Developers"
+[2]: https://developer.android.com/build/releases/agp-9-0-0-release-notes?utm_source=chatgpt.com "Android Gradle plugin 9.0.0 (January 2026)"
+[3]: https://developer.android.com/jetpack/androidx/versions "AndroidX releases  |  Jetpack  |  Android Developers"
+[4]: https://developer.android.com/jetpack/androidx/releases/room?utm_source=chatgpt.com "Room | Jetpack"
+[5]: https://developer.android.com/develop/ui/compose/setup?utm_source=chatgpt.com "Quick start | Jetpack Compose"
+[6]: https://mvnrepository.com/artifact/androidx.compose/compose-bom "Maven Repository: androidx.compose » compose-bom"
+[7]: https://mvnrepository.com/artifact/com.google.devtools.ksp/com.google.devtools.ksp.gradle.plugin/versions?repo=central "Maven Repository: com.google.devtools.ksp » com.google.devtools.ksp.gradle.plugin - Versions"
+[8]: https://developer.android.com/about/versions/16/behavior-changes-16?utm_source=chatgpt.com "Behavior changes: Apps targeting Android 16 or higher"
