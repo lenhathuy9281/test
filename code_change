@@ -1,3 +1,4 @@
+https://chatgpt.com/share/698d3b74-18e4-8013-9cd2-7f01899d046f
 Dưới đây là bộ `dependencies` (kèm `plugins` tối thiểu) cho **từng module** theo đúng sơ đồ bạn đã chốt. Mình viết theo **Version Catalog** (`libs.*`) để bạn copy thẳng vào `build.gradle.kts` của từng module.
 
 > Lưu ý: bạn cần khai báo các alias tương ứng trong `libs.versions.toml` (Compose BOM, Hilt, Room, Paging, Work, Retrofit/OkHttp, Coroutines, Lifecycle, v.v.). Nếu alias bạn khác tên, chỉ cần đổi `libs.xxx` cho khớp.
